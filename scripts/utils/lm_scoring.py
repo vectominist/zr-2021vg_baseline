@@ -4,6 +4,8 @@ from time import time
 from os.path import exists
 
 import torch
+from tqdm import tqdm
+
 
 def compute_proba_BERT_mlm_span(
                             sequences, roberta, tokenized=True,
@@ -197,7 +199,7 @@ def compute_proba_BERT_mlm_span(
                 n_batch += 1
 
             start_time = time()
-            for i in range(n_batch):
+            for i in tqdm(range(n_batch)):
                 sequences_batch = sequences[i*batchsen_size : min((i+1)*batchsen_size, len(sequences))]
                 with torch.no_grad():
                     logproba_batch, shape_statistics = compute_proba_batchsen(sequences_batch)
@@ -216,16 +218,16 @@ def compute_proba_BERT_mlm_span(
                             f.write(outLines)
                             addEndLine = True
 
-                if print_shape_statistics:
-                    print("Batch {:d}/{:d}. Input shapes: {} Done in {:4f} s.\t\t\t".format(
-                        i+1, n_batch,
-                        shape_statistics,
-                        time() - start_time))
-                else:
-                    print("Batch {:d}/{:d}. Done in {:4f} s.\t\t\t".format(
-                        i+1, n_batch,
-                        time() - start_time), 
-                        end="\r")
+                # if print_shape_statistics:
+                #     print("Batch {:d}/{:d}. Input shapes: {} Done in {:4f} s.\t\t\t".format(
+                #         i+1, n_batch,
+                #         shape_statistics,
+                #         time() - start_time))
+                # else:
+                #     print("Batch {:d}/{:d}. Done in {:4f} s.\t\t\t".format(
+                #         i+1, n_batch,
+                #         time() - start_time), 
+                #         end="\r")
             print("\nDone all in {:4f} s.".format(time() - start_time))
         else:
             start_time = time()

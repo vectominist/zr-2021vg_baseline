@@ -4,8 +4,8 @@ from os.path import exists, join, basename, dirname, abspath
 import sys
 import argparse
 
-from scripts.utils.utils_functions import loadRobertaCheckpoint
-from scripts.utils.lm_scoring import compute_proba_BERT_mlm_span
+from utils.utils_functions import loadRobertaCheckpoint
+from utils.lm_scoring import compute_proba_BERT_mlm_span
 
 def parseArgs(argv):
     # Run parameters
@@ -77,22 +77,22 @@ def main(argv):
     # writeArgs(join(pathOutputDir, "_info_args.json"), args)
 
     # Continue
-    if args.resume:
-        if exists(args.pathOutputFile):
-            existing_file_names = []
-            with open(args.pathOutputFile, 'r') as f:
-                lines = [line for line in f]
-            for line in lines:
-                file_name, score = line.strip().split()
-                existing_file_names.append(file_name)
-            assert input_file_names[:len(existing_file_names)] == existing_file_names, \
-                "The file names in the existing output file do not match the input file!!"
-            input_file_names = input_file_names[len(existing_file_names):]
-            intput_file_seqs = intput_file_seqs[len(existing_file_names):]
-            print(f"Found existing output file, continue to compute scores of {len(intput_file_seqs)} sequences left!")
-    else:
-        assert not exists(args.pathOutputFile), \
-            f"Output file {args.pathOutputFile} already exists !!! If you want to continue computing scores, please check the --resume option."
+    # if args.resume:
+    #     if exists(args.pathOutputFile):
+    #         existing_file_names = []
+    #         with open(args.pathOutputFile, 'r') as f:
+    #             lines = [line for line in f]
+    #         for line in lines:
+    #             file_name, score = line.strip().split()
+    #             existing_file_names.append(file_name)
+    #         assert input_file_names[:len(existing_file_names)] == existing_file_names, \
+    #             "The file names in the existing output file do not match the input file!!"
+    #         input_file_names = input_file_names[len(existing_file_names):]
+    #         intput_file_seqs = intput_file_seqs[len(existing_file_names):]
+    #         print(f"Found existing output file, continue to compute scores of {len(intput_file_seqs)} sequences left!")
+    # else:
+    #     assert not exists(args.pathOutputFile), \
+    #         f"Output file {args.pathOutputFile} already exists !!! If you want to continue computing scores, please check the --resume option."
 
     assert len(intput_file_seqs) > 0, \
         "No file to compute probability!"

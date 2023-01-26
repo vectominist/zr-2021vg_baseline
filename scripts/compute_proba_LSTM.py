@@ -4,8 +4,8 @@ from os.path import exists, join, basename, dirname, abspath
 import sys
 import argparse
 
-from scripts.utils.utils_functions import loadLSTMLMCheckpoint
-from scripts.utils.lm_scoring import compute_proba_LSTM
+from utils.utils_functions import loadLSTMLMCheckpoint
+from utils.lm_scoring import compute_proba_LSTM
 
 def parseArgs(argv):
     # Run parameters

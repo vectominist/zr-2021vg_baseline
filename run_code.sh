@@ -15,6 +15,7 @@ lm_name=lm-bert-small-ls960
 
 M=10
 Dt=1
+level=-1
 
 mkdir -p $exp_dir/txt
 mkdir -p $exp_dir/data
@@ -116,7 +117,6 @@ if [ $stage -le 5 ] && [ $end_stage -ge 5 ] && [ $run_syn -ge 1 ]; then
 fi
 
 if [ $stage -le 6 ] && [ $end_stage -ge 6 ] && [ $run_sem -ge 1 ]; then
-    level=-1
     echo "==== Stage 6: Dump BERT features for semantic task & Evaluate (level = $level) ===="
     
     for corpus in librispeech synthetic

@@ -2,7 +2,11 @@
 
 stage=4
 end_stage=6
-skip_5=1
+run_lex=$2  # run lexical if 1 else skip lexical
+run_syn=$3  # run syntactic if 1 else skip syntactic
+run_sem=$4  # run semantic if 1 else skip semantic
+
+layer=$1
 
 n_cluster=500
 lab_dir=~/scratch/exp/pnmi_exp/km_lab/speech_dino_local_5_${n_cluster}
@@ -12,11 +16,15 @@ lm_name=lm-bert-small-ls960
 
 echo "==== Clusters: $n_cluster ===="
 
+M=10
+Dt=1
+level=-1
+
 mkdir -p $exp_dir
 mkdir -p $exp_dir/txt
 mkdir -p $exp_dir/data
-mkdir -p $exp_dir/submission
-mkdir -p $exp_dir/result
+mkdir -p $exp_dir/submission_${M}_${Dt}
+mkdir -p $exp_dir/result_${M}_${Dt}
 
 if [ $stage -le 1 ] && [ $end_stage -ge 1 ]; then
     echo "==== Stage 1: Convert to fairseq ===="
@@ -63,44 +71,70 @@ if [ $stage -le 3 ] && [ $end_stage -ge 3 ]; then
         | tee $exp_dir/$lm_name/train.log
 fi
 
-if [ $stage -le 4 ] && [ $end_stage -ge 4 ]; then
-    echo "==== Stage 4: Extract LM pseudo-probabilities ===="
-    for task in lexical syntactic
+if [ $stage -le 4 ] && [ $end_stage -ge 4 ] && [ $run_lex -ge 1 ]; then
+    echo "==== Stage 4: Extract LM pseudo-probabilities & Evaluate (Lexical) ===="
+    for split in dev # test
     do
-        for split in dev # test
-        do
-            mkdir -p $exp_dir/submission/$task
-            
-            python3 scripts/compute_proba_BERT.py \
-                $lab_dir/$task/zs21_$split.txt \
-                $exp_dir/submission/$task/$split.txt \
-                $exp_dir/$lm_name/checkpoint_best.pt \
-                --dict $exp_dir/data/dict.txt \
-                --decoding_span_size 15 --temporal_sliding_size 5 \
-                --batchsen_size 32
-        done
+        mkdir -p $exp_dir/submission/lexical
+        
+        python3 scripts/compute_proba_BERT.py \
+            $lab_dir/lexical/zs21_$split.txt \
+            $exp_dir/submission_${M}_${Dt}/lexical/$split.txt \
+            $exp_dir/$lm_name/checkpoint_best.pt \
+            --dict $exp_dir/data/dict.txt \
+            --decoding_span_size $M --temporal_sliding_size $Dt \
+            --batchsen_size 32
     done
+
+    zerospeech2021-evaluate $corpus_dir $exp_dir/submission_${M}_${Dt} \
+        -o $exp_dir/result_${M}_${Dt} \
+        --no-phonetic --no-semantic --no-syntactic
+    
+    echo "==== Lexical ===="
+    echo "File: $exp_dir/result_${M}_${Dt}/score_lexical_dev_by_frequency.csv"
+    cat $exp_dir/result_${M}_${Dt}/score_lexical_dev_by_frequency.csv
 fi
 
-if [ $stage -le 5 ] && [ $end_stage -ge 5 ] && [ $skip_5 -le 0 ]; then
-    echo "==== Stage 5: Dump BERT features for semantic task ===="
-    level=-5
+if [ $stage -le 5 ] && [ $end_stage -ge 5 ] && [ $run_syn -ge 1 ]; then
+    echo "==== Stage 5: Extract LM pseudo-probabilities & Evaluate (Syntactic) ===="
+    for split in dev # test
+    do
+        mkdir -p $exp_dir/submission/syntactic
+        
+        python3 scripts/compute_proba_BERT.py \
+            $lab_dir/syntactic/zs21_$split.txt \
+            $exp_dir/submission_${M}_${Dt}/syntactic/$split.txt \
+            $exp_dir/$lm_name/checkpoint_best.pt \
+            --dict $exp_dir/data/dict.txt \
+            --decoding_span_size $M --temporal_sliding_size $Dt \
+            --batchsen_size 32
+    done
+
+    zerospeech2021-evaluate $corpus_dir $exp_dir/submission_${M}_${Dt} \
+        -o $exp_dir/result_${M}_${Dt} \
+        --no-phonetic --no-semantic --no-lexical
+    
+    echo "==== Syntactic ===="
+    echo "File: $exp_dir/result_${M}_${Dt}/score_syntactic_dev_by_type.csv"
+    cat $exp_dir/result_${M}_${Dt}/score_syntactic_dev_by_type.csv
+fi
+
+if [ $stage -le 6 ] && [ $end_stage -ge 6 ] && [ $run_sem -ge 1 ]; then
+    echo "==== Stage 6: Dump BERT features for semantic task & Evaluate (level = $level) ===="
+    
     for corpus in librispeech synthetic
     do
-        mkdir -p $exp_dir/submission/semantic/dev/$corpus
+        mkdir -p $exp_dir/submission_${M}_${Dt}/semantic/dev/$corpus
         python3 scripts/build_BERT_features.py \
             $lab_dir/semantic/$corpus/zs21_dev.txt \
-            $exp_dir/submission/semantic/dev/$corpus \
+            $exp_dir/submission_${M}_${Dt}/semantic/dev/$corpus \
             $exp_dir/$lm_name/checkpoint_best.pt \
             --dict $exp_dir/data/dict.txt \
             --hidden_level $level
     done
-fi
 
-if [ $stage -le 6 ] && [ $end_stage -ge 6 ]; then
-    echo "==== Stage 6: Evaluation ===="
     pwd=`pwd`
-    cd $exp_dir/submission
+    cd $exp_dir/submission_${M}_${Dt}
     cat > meta.yaml <<'EOF'
 author: Heng-Jui Chang
 affiliation: MIT CSAIL
@@ -120,14 +154,46 @@ EOF
     echo "https://github.com/bhigy/zr-2021vg_baseline" > code/README
     cd $pwd
 
-    zerospeech2021-evaluate $corpus_dir $exp_dir/submission -o $exp_dir/result --no-phonetic
-    
-    echo "==== Lexical ===="
-    cat $exp_dir/result/score_lexical_dev_by_frequency.csv
-
-    echo "==== Syntactic ===="
-    cat $exp_dir/result/score_syntactic_dev_by_type.csv
+    zerospeech2021-evaluate $corpus_dir $exp_dir/submission_${M}_${Dt} \
+        -o $exp_dir/result_${M}_${Dt} \
+        --no-phonetic --no-lexical --no-syntactic
 
     echo "==== Semantic ===="
-    cat $exp_dir/result/score_semantic_dev_correlation.csv
+    echo "File: $exp_dir/result_${M}_${Dt}/score_semantic_dev_correlation.csv"
+    cat $exp_dir/result_${M}_${Dt}/score_semantic_dev_correlation.csv
 fi
+
+# if [ $stage -le 6 ] && [ $end_stage -ge 6 ]; then
+#     echo "==== Stage 6: Evaluation ===="
+#     pwd=`pwd`
+#     cd $exp_dir/submission
+#     cat > meta.yaml <<'EOF'
+# author: Heng-Jui Chang
+# affiliation: MIT CSAIL
+# description: High-budget
+# open_source: True
+# train_set: Librispeech
+# gpu_budget: 72.0
+# parameters:
+#   phonetic:
+#     metric: cosine
+#     frame_shift: 0.02
+#   semantic:
+#     metric: cosine
+#     pooling: max
+# EOF
+#     mkdir -p code
+#     echo "https://github.com/bhigy/zr-2021vg_baseline" > code/README
+#     cd $pwd
+
+#     zerospeech2021-evaluate $corpus_dir $exp_dir/submission -o $exp_dir/result --no-phonetic
+    
+#     echo "==== Lexical ===="
+#     cat $exp_dir/result/score_lexical_dev_by_frequency.csv
+
+#     echo "==== Syntactic ===="
+#     cat $exp_dir/result/score_syntactic_dev_by_type.csv
+
+#     echo "==== Semantic ===="
+#     cat $exp_dir/result/score_semantic_dev_correlation.csv
+# fi
